@@ -1,6 +1,5 @@
 $(document).ready(function () {
     $('#uploadFile').on('click', function () {
-
         if ($('#file').prop('files').length == 0) {
             alert('Please select file before submitting!');
             return false;

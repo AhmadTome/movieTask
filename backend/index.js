@@ -23,22 +23,21 @@ app.use(cors());
 
 app.post('/movies', upload.single('file'), function (req, res) {
 
-
-
-
     fs.readFile(req.file.path, 'utf-8', function (error, data) {
         let flag = true;
         let result;
-        if (/^[\],:{}\s]*$/.test(data.replace(/\\["\\\/bfnrtu]/g, '@').
+        const regex = new RegExp("^[\\],:{}\\s]*$");
+        const filteredData = data.replace(/\\["\\\/bfnrtu]/g, '@').
         replace(/"[^"\\\n\r]*"|true|false|null|-?\d+(?:\.\d*)?(?:[eE][+\-]?\d+)?/g, ']').
-        replace(/(?:^|:|,)(?:\s*\[)+/g, ''))) {
+        replace(/(?:^|:|,)(?:\s*\[)+/g, '');
 
+        if (regex.test(filteredData)) {
             //the json is ok
-            const json = JSON.parse(data);
-            if (json['results']) {
-               result = json['results'];
+            const fileDataExtracted = JSON.parse(data);
+            if (fileDataExtracted['results']) {
+               result = fileDataExtracted['results'];
                 // validation
-                result.map((row)=> {
+                result.some((row)=> {
                     if (!row.hasOwnProperty('genre_ids')
                         || !row.hasOwnProperty('vote_average')
                         || !row.hasOwnProperty('adult')
@@ -62,8 +61,9 @@ app.post('/movies', upload.single('file'), function (req, res) {
                 let genra_arr_count = {};
                 let dataToExcel = [];
 
-                result.map((row) => {
 
+
+                let resultJson = result.reduce((acc, row) => {
                     if (row.hasOwnProperty('genre_ids')) {
                         let genra_arr = row['genre_ids'];
                         genra_arr.map((id) => {
@@ -76,17 +76,16 @@ app.post('/movies', upload.single('file'), function (req, res) {
                         });
                     }
 
-
                     if (row.hasOwnProperty('vote_average') && row['vote_average'] > 7) {
-                        Plus7AverageCont++;
+                        acc['Plus7AverageCont'] = acc['Plus7AverageCont'] +1;
                     }
 
                     if (row.hasOwnProperty('vote_average') && row['vote_average'] > 8) {
-                        Plus8AverageCont++;
+                        acc['Plus8AverageCont'] = acc['Plus8AverageCont'] +1;
                     }
 
                     if (row.hasOwnProperty('adult') && row['adult']) {
-                        adultMoveCount++;
+                        acc['adultMoveCount'] = acc['adultMoveCount'] +1;
                     }
 
                     dataToExcel.push({
@@ -94,7 +93,19 @@ app.post('/movies', upload.single('file'), function (req, res) {
                         title: row['title'],
                         vote_average: row['vote_average'],
                     });
-                });
+                    return acc;
+
+
+                }, {
+                    Plus7AverageCont: 0,
+                    Plus8AverageCont: 0,
+                    adultMoveCount: 0,
+                    genra_arr: genra_arr_count,
+                    count: 0,
+                    excelFilePath: "",
+                })
+
+
 
 
                 const workSheetColumnName = [
@@ -105,24 +116,18 @@ app.post('/movies', upload.single('file'), function (req, res) {
                 const workSheetName = 'Rating';
                 const filePath = './uploads/' + Date.now() + 'excel.xlsx';
                 exportDataToExcel(dataToExcel, workSheetColumnName, workSheetName, filePath);
+                resultJson.excelFilePath = filePath;
 
                 let keys = Object.keys(genra_arr_count);
-                let count = 0;
-                keys.map((key) => {
+                let count = keys.reduce((count, key) => {
                     if (genra_arr_count[key] > 1) {
-                        count++
+                       // console.log(genra_arr_count[key]);
+                        return resultJson.count++;
                     }
-                });
+                    return 0;
+                }, 0);
 
-
-                res.json({
-                    Plus7AverageCont: Plus7AverageCont,
-                    Plus8AverageCont: Plus8AverageCont,
-                    adultMoveCount: adultMoveCount,
-                    genra_arr: genra_arr_count,
-                    count: count,
-                    excelFilePath: filePath,
-                });
+                res.json(resultJson);
             } else {
                 flag = false;
             }
