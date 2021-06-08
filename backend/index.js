@@ -37,36 +37,32 @@ app.post('/movies', upload.single('file'), function (req, res) {
             if (fileDataExtracted['results']) {
                result = fileDataExtracted['results'];
                 // validation
-                result.some((row)=> {
-                    if (!row.hasOwnProperty('genre_ids')
+                var isNotValid = result.some((row)=> {
+                    return !row.hasOwnProperty('genre_ids')
                         || !row.hasOwnProperty('vote_average')
                         || !row.hasOwnProperty('adult')
                         || !row.hasOwnProperty('id')
                         || !row.hasOwnProperty('title')
-                    ) {
-                        res.json({
-                            Plus7AverageCont: 0,
-                            Plus8AverageCont: 0,
-                            adultMoveCount: 0,
-                            count: 0,
-                            excelFilePath: "noPath",
-                        });
-                    }
                 });
 
+                if (isNotValid) {
+                    res.json({
+                        Plus7AverageCont: 0,
+                        Plus8AverageCont: 0,
+                        adultMoveCount: 0,
+                        count: 0,
+                        excelFilePath: "noPath",
+                    });
+                }
 
-                let Plus8AverageCont = 0;
-                let Plus7AverageCont = 0;
-                let adultMoveCount = 0;
+
+
                 let genra_arr_count = {};
-                let dataToExcel = [];
-
-
 
                 let resultJson = result.reduce((acc, row) => {
                     if (row.hasOwnProperty('genre_ids')) {
                         let genra_arr = row['genre_ids'];
-                        genra_arr.map((id) => {
+                        genra_arr.forEach((id) => {
                             if (genra_arr_count[id]) {
                                 let val = genra_arr_count[id];
                                 genra_arr_count[id] = val + 1;
@@ -76,24 +72,23 @@ app.post('/movies', upload.single('file'), function (req, res) {
                         });
                     }
 
+                    let moviesProperties = {};
+
                     if (row.hasOwnProperty('vote_average') && row['vote_average'] > 7) {
-                        acc['Plus7AverageCont'] = acc['Plus7AverageCont'] +1;
+                        moviesProperties.Plus7AverageCont = acc['Plus7AverageCont']++;
                     }
 
                     if (row.hasOwnProperty('vote_average') && row['vote_average'] > 8) {
-                        acc['Plus8AverageCont'] = acc['Plus8AverageCont'] +1;
+                        moviesProperties.Plus8AverageCont = acc['Plus8AverageCont']++;
                     }
 
                     if (row.hasOwnProperty('adult') && row['adult']) {
-                        acc['adultMoveCount'] = acc['adultMoveCount'] +1;
+                        moviesProperties.adultMoveCount = acc['adultMoveCount']++;
                     }
 
-                    dataToExcel.push({
-                        id: row['id'],
-                        title: row['title'],
-                        vote_average: row['vote_average'],
-                    });
-                    return acc;
+                    moviesProperties.dataToExcel = acc['dataToExcel'].push({id: row['id'], title: row['title'], vote_average: row['vote_average']});
+
+                    return {moviesProperties, ...acc};
 
 
                 }, {
@@ -103,10 +98,8 @@ app.post('/movies', upload.single('file'), function (req, res) {
                     genra_arr: genra_arr_count,
                     count: 0,
                     excelFilePath: "",
+                    dataToExcel: [],
                 })
-
-
-
 
                 const workSheetColumnName = [
                     "ID",
@@ -115,28 +108,23 @@ app.post('/movies', upload.single('file'), function (req, res) {
                 ]
                 const workSheetName = 'Rating';
                 const filePath = './uploads/' + Date.now() + 'excel.xlsx';
-                exportDataToExcel(dataToExcel, workSheetColumnName, workSheetName, filePath);
+                exportDataToExcel(resultJson.dataToExcel, workSheetColumnName, workSheetName, filePath);
                 resultJson.excelFilePath = filePath;
 
                 let keys = Object.keys(genra_arr_count);
-                let count = keys.reduce((count, key) => {
+                keys.forEach((key) => {
                     if (genra_arr_count[key] > 1) {
-                       // console.log(genra_arr_count[key]);
-                        return resultJson.count++;
+                         resultJson.count++;
                     }
-                    return 0;
-                }, 0);
+                });
 
                 res.json(resultJson);
             } else {
                 flag = false;
             }
-
         }else{
-
             //the json is not ok
             flag = false;
-
         }
 
         if (!flag) {
@@ -148,8 +136,6 @@ app.post('/movies', upload.single('file'), function (req, res) {
                 excelFilePath: "noPath",
             });
         }
-
-
     })
 
 
